@@ -5,86 +5,63 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Today</title>
     <style>
-        :root {
-            --bg: #0f172a;
-            --card: #1e293b;
-            --text: #f8fafc;
-            --accent: #38bdf8;
-            --dim: #64748b;
-            --danger: #ef4444;
+        :root { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --accent: #38bdf8; --dim: #64748b; }
+        body { background: var(--bg); color: var(--text); font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 40px 20px; margin: 0; min-height: 100vh; }
+        .container { width: 100%; max-width: 400px; }
+        #taskInput { width: 100%; padding: 16px; border-radius: 12px; border: 1px solid #334155; background: var(--card); color: white; margin-bottom: 20px; box-sizing: border-box; font-size: 16px; outline: none; }
+        .task-item { background: var(--card); margin-bottom: 12px; border-radius: 12px; display: flex; align-items: center; border-left: 4px solid var(--accent); }
+        .task-content { flex-grow: 1; padding: 15px; cursor: pointer; }
+        .task-text { display: block; font-size: 1.1rem; }
+        .completed { opacity: 0.5; border-left-color: var(--dim); }
+        .completed .task-text { text-decoration: line-through; color: var(--dim); }
+        .delete-btn { padding: 15px 20px; color: var(--dim); font-size: 1.5rem; cursor: pointer; }
+        .time-left { font-size: 0.75rem; color: var(--dim); }
+        .count { margin-bottom: 8px; font-size: 0.85rem; color: var(--dim); text-align: right; }
+    </style>
+</head>
+<body>
+    <h1>Today</h1>
+    <div class="container">
+        <div class="count" id="taskCount">0 / 5</div>
+        <input type="text" id="taskInput" placeholder="What's essential?" maxlength="50">
+        <div id="taskList"></div>
+    </div>
+    <script>
+        const input = document.getElementById('taskInput');
+        const listContainer = document.getElementById('taskList');
+        const countDisplay = document.getElementById('taskCount');
+        let tasks = JSON.parse(localStorage.getItem('ephemeralTasks')) || [];
+
+        function updateUI() {
+            const now = Date.now();
+            tasks = tasks.filter(t => (now - t.createdAt) < 86400000);
+            localStorage.setItem('ephemeralTasks', JSON.stringify(tasks));
+            listContainer.innerHTML = '';
+            tasks.forEach((task, i) => {
+                const item = document.createElement('div');
+                item.className = `task-item ${task.completed ? 'completed' : ''}`;
+                item.innerHTML = `
+                    <div class="task-content" onclick="toggleTask(${i})">
+                        <span class="task-text">${task.text}</span>
+                        <span class="time-left">${Math.max(0, Math.floor((86400000 - (now - task.createdAt))/3600000))}h remaining</span>
+                    </div>
+                    <div class="delete-btn" onclick="deleteTask(${i})">&times;</div>`;
+                listContainer.appendChild(item);
+            });
+            countDisplay.innerText = `${tasks.length} / 5`;
+            input.style.display = tasks.length >= 5 ? 'none' : 'block';
         }
 
-        body {
-            background-color: var(--bg);
-            color: var(--text);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 40px 20px;
-            margin: 0;
-            min-height: 100vh;
+        function addTask(text) {
+            if (tasks.length < 5 && text.trim()) {
+                tasks.push({ text: text, createdAt: Date.now(), completed: false });
+                updateUI();
+            }
         }
-
-        h1 { 
-            color: var(--accent); 
-            font-weight: 300; 
-            letter-spacing: 3px; 
-            margin-bottom: 30px;
-            text-transform: uppercase;
-        }
-
-        .container { 
-            width: 100%; 
-            max-width: 400px; 
-        }
-        
-        #taskInput {
-            width: 100%; 
-            padding: 16px; 
-            border-radius: 12px; 
-            border: 1px solid #334155;
-            background: var(--card); 
-            color: white; 
-            margin-bottom: 20px; 
-            box-sizing: border-box;
-            font-size: 16px; /* Prevents iOS zoom on focus */
-            outline: none;
-            transition: border-color 0.2s;
-        }
-
-        #taskInput:focus {
-            border-color: var(--accent);
-        }
-        
-        .task-item {
-            background: var(--card);
-            margin-bottom: 12px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            border-left: 4px solid var(--accent);
-            animation: slideIn 0.3s ease-out;
-            overflow: hidden;
-        }
-
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .task-content {
-            flex-grow: 1;
-            padding: 15px;
-            cursor: pointer;
-            user-select: none;
-        }
-
-        .task-text {
-            display: block;
-            font-size: 1.1rem;
-            margin-bottom: 4px;
-        }
-
-        .time-left { 
-            font-size: 0.75rem;
+        window.toggleTask = (i) => { tasks[i].completed = !tasks[i].completed; updateUI(); };
+        window.deleteTask = (i) => { tasks.splice(i, 1); updateUI(); };
+        input.addEventListener('keypress', (e) => { if (e.key === 'Enter') { addTask(input.value); input.value = ''; } });
+        updateUI();
+    </script>
+</body>
+</html>
