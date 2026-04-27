@@ -29,7 +29,7 @@
     <h1>24 Hour Memory</h1>
     <div class="container">
         <div class="count" id="taskCount">0 / 5</div>
-        <input type="text" id="taskInput" placeholder="Enter a memory..." maxlength="50">
+        <input type="text" id="taskInput" placeholder="What do you want to remember?" maxlength="50">
         <div id="taskList"></div>
     </div>
     <script>
@@ -87,7 +87,7 @@
         window.resetTask = (i) => { tasks[i].createdAt = Date.now(); updateUI(); };
 
         input.addEventListener('keypress', (e) => { if (e.key === 'Enter') { addTask(input.value); input.value = ''; } });
-        setInterval(updateUI, 30000); // Update every 30s for smoother color feel
+        setInterval(updateUI, 30000);
         updateUI();
     </script>
 </body>
