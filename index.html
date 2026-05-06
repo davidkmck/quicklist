@@ -5,90 +5,97 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>24 Hour Memory</title>
     <style>
-        :root { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --dim: #64748b; }
-        body { background: var(--bg); color: var(--text); font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 40px 20px; margin: 0; min-height: 100vh; }
-        h1 { color: #38bdf8; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 30px; text-align: center; }
-        .container { width: 100%; max-width: 400px; }
-        #taskInput { width: 100%; padding: 16px; border-radius: 12px; border: 1px solid #334155; background: var(--card); color: white; margin-bottom: 20px; box-sizing: border-box; font-size: 16px; outline: none; }
+        :root { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --accent: #22d3ee; --dim: #64748b; }
+        body { background: var(--bg); color: var(--text); font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; min-height: 100vh; }
+        h1 { color: var(--accent); font-weight: 300; letter-spacing: 2px; text-transform: uppercase; margin: 20px 0; }
         
-        .task-item { background: var(--card); margin-bottom: 12px; border-radius: 12px; display: flex; align-items: center; border-left: 5px solid var(--item-color); transition: all 0.5s ease; overflow: hidden; }
-        .task-content { flex-grow: 1; padding: 15px; cursor: pointer; min-width: 0; }
-        .task-text { display: block; font-size: 1.1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .input-container { width: 100%; max-width: 340px; margin-bottom: 20px; display: flex; gap: 10px; }
+        input { flex: 1; background: var(--card); border: 1px solid #334155; border-radius: 12px; padding: 12px; color: white; outline: none; font-size: 1rem; }
+        button { background: var(--accent); color: var(--bg); border: none; border-radius: 12px; padding: 12px 20px; font-weight: bold; cursor: pointer; }
+
+        .list { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 10px; }
+        .item { background: var(--card); padding: 15px; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; animation: slideIn 0.3s ease; border-left: 4px solid var(--accent); }
         
-        .completed { opacity: 0.3; filter: grayscale(1); }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
         
-        .action-btn { padding: 15px; color: var(--dim); cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .refresh-btn { font-size: 1.2rem; }
-        .delete-btn { font-size: 1.5rem; }
+        .item-text { flex: 1; margin-right: 10px; }
+        .time { font-size: 0.6rem; color: var(--dim); display: block; margin-top: 4px; }
+        .delete-btn { color: var(--dim); background: none; border: none; font-size: 1.2rem; cursor: pointer; padding: 5px; }
         
-        .time-left { font-size: 0.75rem; color: var(--item-color); font-weight: bold; }
-        .count { margin-bottom: 8px; font-size: 0.85rem; color: var(--dim); text-align: right; }
+        /* Urgency Colors */
+        .urgent { border-left-color: #f43f5e; } /* Red for items > 20h old */
     </style>
 </head>
 <body>
+
     <h1>24 Hour Memory</h1>
-    <div class="container">
-        <div class="count" id="taskCount">0 / 5</div>
-        <input type="text" id="taskInput" placeholder="What do you want to remember?" maxlength="50">
-        <div id="taskList"></div>
+
+    <div class="input-container">
+        <input type="text" id="taskInput" placeholder="Add a memory..." autocomplete="off">
+        <button onclick="addItem()">Add</button>
     </div>
+
+    <div id="taskList" class="list"></div>
+
     <script>
+        let tasks = JSON.parse(localStorage.getItem('memoryTasks')) || [];
         const input = document.getElementById('taskInput');
-        const listContainer = document.getElementById('taskList');
-        const countDisplay = document.getElementById('taskCount');
-        let tasks = JSON.parse(localStorage.getItem('ephemeralTasks')) || [];
+        const list = document.getElementById('taskList');
 
-        function getColor(hoursLeft) {
-            if (hoursLeft > 20) return '#22d3ee'; // Cyan
-            if (hoursLeft > 16) return '#4ade80'; // Green
-            if (hoursLeft > 12) return '#facc15'; // Yellow
-            if (hoursLeft > 8)  return '#fb923c'; // Orange
-            if (hoursLeft > 4)  return '#f87171'; // Light Red
-            return '#ef4444'; // Deep Red
-        }
-
-        function updateUI() {
-            const now = Date.now();
-            tasks = tasks.filter(t => (now - t.createdAt) < 86400000);
-            localStorage.setItem('ephemeralTasks', JSON.stringify(tasks));
+        function addItem() {
+            if (!input.value.trim()) return;
             
-            listContainer.innerHTML = '';
-            tasks.forEach((task, i) => {
-                const msLeft = 86400000 - (now - task.createdAt);
-                const h = Math.max(0, Math.floor(msLeft / 3600000));
-                const m = Math.max(0, Math.floor((msLeft / 60000) % 60));
-                const color = getColor(h);
-                
+            const newTask = {
+                id: Date.now(),
+                text: input.value,
+                timestamp: new Date().getTime()
+            };
+
+            // This is the change: unshift puts it at the beginning
+            tasks.unshift(newTask);
+            input.value = '';
+            saveAndRender();
+        }
+
+        // Allow Enter key to add item
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addItem();
+        });
+
+        function deleteTask(id) {
+            tasks = tasks.filter(t => t.id !== id);
+            saveAndRender();
+        }
+
+        function saveAndRender() {
+            // Filter out items older than 24 hours automatically
+            const now = new Date().getTime();
+            tasks = tasks.filter(t => now - t.timestamp < 24 * 60 * 60 * 1000);
+            
+            localStorage.setItem('memoryTasks', JSON.stringify(tasks));
+            
+            list.innerHTML = '';
+            tasks.forEach(task => {
+                const ageHours = (now - task.timestamp) / (1000 * 60 * 60);
                 const item = document.createElement('div');
-                item.className = `task-item ${task.completed ? 'completed' : ''}`;
-                item.style.setProperty('--item-color', color);
+                item.className = `item ${ageHours > 20 ? 'urgent' : ''}`;
+                
+                const timeStr = new Date(task.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                
                 item.innerHTML = `
-                    <div class="task-content" onclick="toggleTask(${i})">
-                        <span class="task-text">${task.text}</span>
-                        <span class="time-left">${h}h ${m}m remaining</span>
+                    <div class="details">
+                        <div class="item-text">${task.text}</div>
+                        <span class="time">${timeStr}</span>
                     </div>
-                    <div class="action-btn refresh-btn" onclick="resetTask(${i})">↻</div>
-                    <div class="action-btn delete-btn" onclick="deleteTask(${i})">&times;</div>`;
-                listContainer.appendChild(item);
+                    <button class="delete-btn" onclick="deleteTask(${task.id})">×</button>
+                `;
+                list.appendChild(item);
             });
-            countDisplay.innerText = `${tasks.length} / 5`;
-            input.style.display = tasks.length >= 5 ? 'none' : 'block';
         }
 
-        function addTask(text) {
-            if (tasks.length < 5 && text.trim()) {
-                tasks.push({ text: text, createdAt: Date.now(), completed: false });
-                updateUI();
-            }
-        }
-
-        window.toggleTask = (i) => { tasks[i].completed = !tasks[i].completed; updateUI(); };
-        window.deleteTask = (i) => { tasks.splice(i, 1); updateUI(); };
-        window.resetTask = (i) => { tasks[i].createdAt = Date.now(); updateUI(); };
-
-        input.addEventListener('keypress', (e) => { if (e.key === 'Enter') { addTask(input.value); input.value = ''; } });
-        setInterval(updateUI, 30000);
-        updateUI();
+        // Run cleanup/render every minute to handle the 24h expiration
+        setInterval(saveAndRender, 60000);
+        saveAndRender();
     </script>
 </body>
 </html>
