@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>24 Hour Memory</title>
     <style>
-        :root { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --accent: #22d3ee; --dim: #64748b; }
+        :root { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --accent: #22d3ee; --dim: #64748b; --urgent: #f43f5e; }
         body { background: var(--bg); color: var(--text); font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; min-height: 100vh; }
         h1 { color: var(--accent); font-weight: 300; letter-spacing: 2px; text-transform: uppercase; margin: 20px 0; }
         
@@ -14,16 +14,13 @@
         button { background: var(--accent); color: var(--bg); border: none; border-radius: 12px; padding: 12px 20px; font-weight: bold; cursor: pointer; }
 
         .list { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 10px; }
-        .item { background: var(--card); padding: 15px; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; animation: slideIn 0.3s ease; border-left: 4px solid var(--accent); }
+        .item { background: var(--card); padding: 15px; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--accent); transition: 0.3s; }
+        .item.urgent { border-left-color: var(--urgent); }
         
-        @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-        
-        .item-text { flex: 1; margin-right: 10px; }
-        .time { font-size: 0.6rem; color: var(--dim); display: block; margin-top: 4px; }
-        .delete-btn { color: var(--dim); background: none; border: none; font-size: 1.2rem; cursor: pointer; padding: 5px; }
-        
-        /* Urgency Colors */
-        .urgent { border-left-color: #f43f5e; } /* Red for items > 20h old */
+        .item-text { font-size: 1rem; margin-bottom: 4px; }
+        .time-left { font-size: 0.65rem; font-weight: bold; color: var(--dim); text-transform: uppercase; letter-spacing: 0.5px; }
+        .urgent .time-left { color: var(--urgent); }
+        .delete-btn { color: var(--dim); background: none; border: none; font-size: 1.5rem; cursor: pointer; padding: 0 5px; line-height: 1; }
     </style>
 </head>
 <body>
@@ -38,29 +35,29 @@
     <div id="taskList" class="list"></div>
 
     <script>
-        let tasks = JSON.parse(localStorage.getItem('memoryTasks')) || [];
+        // RECOVERY LOGIC: Check old names and migrate to 'memoryTasks'
+        let tasks = JSON.parse(localStorage.getItem('memoryTasks')) || 
+                    JSON.parse(localStorage.getItem('listItems')) || [];
+
         const input = document.getElementById('taskInput');
         const list = document.getElementById('taskList');
 
         function addItem() {
-            if (!input.value.trim()) return;
+            const val = input.value.trim();
+            if (!val) return;
             
             const newTask = {
                 id: Date.now(),
-                text: input.value,
-                timestamp: new Date().getTime()
+                text: val,
+                timestamp: Date.now()
             };
 
-            // This is the change: unshift puts it at the beginning
             tasks.unshift(newTask);
             input.value = '';
             saveAndRender();
         }
 
-        // Allow Enter key to add item
-        input.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') addItem();
-        });
+        input.addEventListener('keypress', (e) => { if (e.key === 'Enter') addItem(); });
 
         function deleteTask(id) {
             tasks = tasks.filter(t => t.id !== id);
@@ -68,24 +65,29 @@
         }
 
         function saveAndRender() {
-            // Filter out items older than 24 hours automatically
-            const now = new Date().getTime();
-            tasks = tasks.filter(t => now - t.timestamp < 24 * 60 * 60 * 1000);
-            
+            const now = Date.now();
+            const limit = 24 * 60 * 60 * 1000;
+
+            // Auto-delete items older than 24 hours
+            tasks = tasks.filter(t => now - t.timestamp < limit);
             localStorage.setItem('memoryTasks', JSON.stringify(tasks));
             
             list.innerHTML = '';
             tasks.forEach(task => {
-                const ageHours = (now - task.timestamp) / (1000 * 60 * 60);
-                const item = document.createElement('div');
-                item.className = `item ${ageHours > 20 ? 'urgent' : ''}`;
+                const elapsed = now - task.timestamp;
+                const remaining = limit - elapsed;
                 
-                const timeStr = new Date(task.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const hours = Math.floor(remaining / (1000 * 60 * 60));
+                const mins = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+                
+                const item = document.createElement('div');
+                const isUrgent = hours < 4;
+                item.className = `item ${isUrgent ? 'urgent' : ''}`;
                 
                 item.innerHTML = `
-                    <div class="details">
+                    <div>
                         <div class="item-text">${task.text}</div>
-                        <span class="time">${timeStr}</span>
+                        <span class="time-left">${hours}h ${mins}m remaining</span>
                     </div>
                     <button class="delete-btn" onclick="deleteTask(${task.id})">×</button>
                 `;
@@ -93,7 +95,7 @@
             });
         }
 
-        // Run cleanup/render every minute to handle the 24h expiration
+        // Update countdown every minute
         setInterval(saveAndRender, 60000);
         saveAndRender();
     </script>
